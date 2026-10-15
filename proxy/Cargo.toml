@@ -1,0 +1,16 @@
+[package]
+name = "livesim2-c2pa"
+version = "0.1.0"
+edition = "2021"
+description = "A C2PA Verifiable Segment Info signing proxy and verifier for DASH-IF livesim2 streams"
+license = "MIT"
+publish = false
+
+[dependencies]
+anyhow = "1"
+chrono = "0.4"
+# Experimental C2PA 2.5 Live Media support (contentauth/c2pa-rs#2862), pinned to the head of the
+# stacked PR chain #2864 → #2870 until it merges upstream.
+c2pa = { git = "https://github.com/mrappard/c2pa-rs-text-support", rev = "8f16c0f78673461ba41c184e71d29a6492be571c", features = ["unstable_live_video"] }
+tiny_http = "0.12"
+ureq = "2"

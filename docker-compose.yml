@@ -1,0 +1,7 @@
+# DASH-IF livesim2, built from its v1.14.0 release tag.
+services:
+  livesim2:
+    build: https://github.com/Dash-Industry-Forum/livesim2.git#v1.14.0
+    image: livesim2:v1.14.0
+    ports:
+      - "8888:8888"

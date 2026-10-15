@@ -1,0 +1,5 @@
+target/
+pkg/
+work/
+proxy/config/session.key
+.DS_Store

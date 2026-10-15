@@ -1,0 +1,39 @@
+[package]
+name = "dash-c2pa-live"
+description = "C2PA verification of DASH segments in the browser, including live Verifiable Segment Info, for dash.js"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Experimental C2PA 2.5 Live Media support (contentauth/c2pa-rs#2862), pinned to the head of the
+# stacked PR chain #2864 → #2870 until it merges upstream.
+c2pa = { git = "https://github.com/mrappard/c2pa-rs-text-support", rev = "8f16c0f78673461ba41c184e71d29a6492be571c", default-features = false, features = ["rust_native_crypto", "unstable_live_video"] }
+chrono = { version = "0.4", default-features = false }
+serde-wasm-bindgen = "0.6"
+serde = { version = "1", features = ["derive"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
+# Rust >= 1.82 emits these wasm features by default; wasm-pack's bundled
+# wasm-opt rejects the module unless they are enabled explicitly.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    "-Oz",
+    "--enable-bulk-memory",
+    "--enable-nontrapping-float-to-int",
+    "--enable-sign-ext",
+    "--enable-mutable-globals",
+    "--enable-reference-types",
+    "--enable-multivalue",
+]

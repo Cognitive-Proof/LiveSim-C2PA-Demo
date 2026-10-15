@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live C2PA VSI</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #16181d; --muted: #5b6270; --line: #e3e5ea;
+    --ok: #1a7f37; --bad: #c62828; --blocked-bg: #fdecea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121417; --fg: #e8eaee; --muted: #9aa1ad; --line: #2a2e35;
+      --ok: #4cc26a; --bad: #ff6b60; --blocked-bg: #3a1d1b;
+    }
+  }
+  body { font: 15px/1.45 system-ui, sans-serif; margin: 16px; background: var(--bg); color: var(--fg); }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  p { margin: 4px 0 12px; color: var(--muted); max-width: 72ch; }
+  video { width: 100%; max-width: 720px; background: #000; display: block; }
+  .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+  .stats { display: flex; gap: 20px; font-variant-numeric: tabular-nums; }
+  .stats b { font-size: 1.15rem; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .table-wrap { overflow-x: auto; max-height: 45vh; overflow-y: auto; border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.why { white-space: normal; min-width: 24ch; }
+  tr.blocked td { background: var(--blocked-bg); }
+</style>
+</head>
+<body>
+<h1>Live stream with C2PA Verifiable Segment Info</h1>
+<p>Each live media segment's VSI signature is checked with c2pa-rs (wasm) against the session keys in its init segment, before dash.js buffers it.</p>
+
+<video id="video" controls muted autoplay></video>
+
+<div class="controls">
+  <label>Policy
+    <select id="policy">
+      <option value="annotate">annotate</option>
+      <option value="block">block invalid segments</option>
+    </select>
+  </label>
+  <span class="stats">
+    <span>valid <b id="valid" class="ok">0</b></span>
+    <span>invalid <b id="invalid" class="bad">0</b></span>
+    <span>blocked <b id="blocked">0</b></span>
+  </span>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>time</th><th>track</th><th>seq</th><th>method</th><th>state</th><th>why</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/dashjs@5.2.1/dist/modern/umd/dash.all.min.js"></script>
+<script type="module">
+import { attachC2paVerifier } from '../examples/interceptor.js';
+
+const params = new URLSearchParams(location.search);
+const mpdUrl = params.get('mpd') ?? 'http://127.0.0.1:9090/livesim2/testpic_2s/Manifest.mpd';
+const policy = params.get('policy') ?? 'annotate';
+document.getElementById('policy').value = policy;
+document.getElementById('policy').addEventListener('change', (e) => {
+  params.set('policy', e.target.value);
+  location.search = params.toString();
+});
+
+// Media time 0 for a dynamic MPD: availabilityStartTime + the first Period's start.
+async function mediaTimeOrigin(url) {
+  const mpd = new DOMParser().parseFromString(await (await fetch(url)).text(), 'application/xml');
+  const root = mpd.documentElement;
+  const ast = Date.parse(root.getAttribute('availabilityStartTime') ?? '1970-01-01T00:00:00Z');
+  const start = root.querySelector('Period')?.getAttribute('start') ?? 'PT0S';
+  const m = /PT(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?/.exec(start) ?? [];
+  const seconds = (+(m[1] ?? 0)) * 3600 + (+(m[2] ?? 0)) * 60 + (+(m[3] ?? 0));
+  return ast + seconds * 1000;
+}
+
+const counts = { valid: 0, invalid: 0, blocked: 0 };
+const rows = document.getElementById('rows');
+function addRow(r) {
+  const invalid = r.error !== undefined || r.state === 'Invalid';
+  counts[invalid ? 'invalid' : 'valid'] += 1;
+  if (r.blocked) counts.blocked += 1;
+  for (const k of Object.keys(counts)) document.getElementById(k).textContent = counts[k];
+
+  const why = r.error ?? (r.failures ?? []).map((f) => `${f.code}: ${f.explanation}`).join('; ');
+  const tr = document.createElement('tr');
+  if (r.blocked) tr.className = 'blocked';
+  const cells = [
+    new Date().toISOString().slice(11, 23),
+    r.key,
+    r.sequenceNumber ?? '',
+    r.method,
+    (r.state ?? 'error') + (r.blocked ? ' (blocked)' : ''),
+    why,
+  ];
+  cells.forEach((text, i) => {
+    const td = document.createElement('td');
+    td.textContent = text;
+    if (i === 4) td.className = invalid ? 'bad' : 'ok';
+    if (i === 5) td.className = 'why';
+    tr.appendChild(td);
+  });
+  rows.prepend(tr);
+}
+
+const player = dashjs.MediaPlayer().create();
+await attachC2paVerifier(player, addRow, { policy, mediaTimeOrigin: await mediaTimeOrigin(mpdUrl) });
+player.initialize(document.getElementById('video'), mpdUrl, true);
+window.player = player;
+</script>
+</body>
+</html>

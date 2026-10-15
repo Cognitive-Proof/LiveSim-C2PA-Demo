@@ -1,0 +1,24 @@
+{
+  "alg": "es256",
+  "private_key": "es256_private.key",
+  "sign_cert": "es256_certs.pem",
+  "claim_generator_info": [{ "name": "livesim2-c2pa", "version": "0.1.0" }],
+  "title": "livesim2 testpic_2s",
+  "assertions": [
+    {
+      "label": "c2pa.actions",
+      "data": {
+        "actions": [
+          {
+            "action": "c2pa.created",
+            "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCreation"
+          }
+        ]
+      }
+    },
+    {
+      "label": "c2pa.livevideo.segment",
+      "data": { "sequenceNumber": 0, "streamId": "livesim2/testpic_2s/V300", "continuityMethod": "c2pa.manifestId" }
+    }
+  ]
+}
